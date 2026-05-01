@@ -11,7 +11,7 @@ use tar::Archive;
 use xz::read::XzDecoder;
 
 static PREBUILT_LLVM_URL_LLVM7: &str =
-    "https://github.com/rust-gpu/rustc_codegen_nvvm-llvm/releases/download/LLVM-7.1.0/";
+    "https://github.com/rust-gpu/rustc_codegen_nvvm-llvm/releases/download/llvm-7.1.0/";
 
 fn main() {
     rustc_llvm_build(llvm19_enabled());
@@ -181,6 +181,13 @@ fn find_llvm_config_llvm7(target: &str) -> PathBuf {
             .expect("Failed to download prebuilt LLVM");
     }
 
+    let response_code = easy.response_code().unwrap();
+    if response_code != 200 {
+        fail(&format!(
+            "Failed to download prebuilt LLVM from {url}. HTTP response code: {response_code}"
+        ));
+    }
+
     let decompressor = XzDecoder::new(xz_encoded.as_slice());
     let mut ar = Archive::new(decompressor);
 
@@ -320,6 +327,12 @@ fn rustc_llvm_build(llvm19_enabled: bool) {
         if flag.starts_with("-flto") {
             continue;
         }
+
+        // if we are on msvc, ignore all -W flags as msvc uses /W and -W is invalid.
+        if target.contains("msvc") && flag.starts_with("-W") {
+            continue;
+        }
+
         // ignore flags that aren't supported in gcc 8
         if flag == "-Wcovered-switch-default" {
             continue;
